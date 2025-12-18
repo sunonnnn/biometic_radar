@@ -7,6 +7,8 @@ from sensor_client import SensorClient
 from sensor_list_widget import SensorListWidget
 from map_view_controller import MapViewController
 from marker_manager import MarkerManager
+from ntrip_client import NtripClient
+from ntrip_manager import NtripManager
 import config
 
 
@@ -19,6 +21,7 @@ class BiometricRadarApp(QMainWindow):
         self._setup_sensor_client()
         self._setup_ui()
         self._setup_controllers()
+        self._setup_ntrip()
         self._start_application()
     
     def _setup_window(self):
@@ -61,7 +64,28 @@ class BiometricRadarApp(QMainWindow):
         
         self.map_controller = MapViewController(self.map_label, self.map)
         self.map_controller.set_update_callback(self.update_map)
-    
+
+    def _setup_ntrip(self):
+        try:
+            ntrip_client = NtripClient(
+                config.HOST_ADDRESS,
+                config.HOST_PORT,
+                config.USER_ID,
+                config.USER_PW,
+                config.MOUNT_POINT
+            )
+
+            if ntrip_client.connect():
+                self.ntrip_manager = NtripManager(ntrip_client, self.sensor_client)
+                self.ntrip_manager.start()
+            else:
+                print("NTRIP connection failed, continuing without RTK")
+                self.ntrip_manager = None
+                
+        except Exception as e:
+            print(f"NTRIP setup error: {e}, continuing without RTK")
+            self.ntrip_manager = None
+
     def _start_application(self):
         self.sensor_client.start()
         
@@ -109,7 +133,12 @@ class BiometricRadarApp(QMainWindow):
     
     def closeEvent(self, event):
         print("Closing application...")
+        
+        if hasattr(self, 'ntrip_manager') and self.ntrip_manager:
+            self.ntrip_manager.stop()
+        
         self.sensor_client.stop()
+        
         event.accept()
 
 

@@ -4,25 +4,12 @@ import base64
 
 class NtripClient:
     
-    def __init__(self):
-        self.host_address = None
-        self.host_port = None
-        self.user_id = None
-        self.user_pw = None
-        self.mount_point = None
-        self.socket = None
-        self.auth = None
-    
-    def set_host(self, address, port):
-        self.host_address = address
+    def __init__(self, addr, port, id, pw, mount):
+        self.host_address = addr
         self.host_port = port
-    
-    def set_login_info(self, user_id, password):
-        self.user_id = user_id
-        self.user_pw = password
-    
-    def set_mountpoint(self, mountpoint):
-        self.mount_point = mountpoint
+        self.user_id = id
+        self.user_pw = pw
+        self.mount_point = mount
         self.auth = base64.b64encode(f"{self.user_id}:{self.user_pw}".encode()).decode()
     
     def connect(self):
@@ -69,12 +56,15 @@ if __name__ == "__main__":
     USER_PW = "ngii"
     MOUNT_POINT = "RTK-RTCM32"
     NMEA_MESSAGE = "$GPGGA,123519,3735.0079,N,12701.6446,E,1,12,0.8,45.0,M,19.6,M,,*72"
-    
-    client = NtripClient()
-    client.set_host(HOST_ADDRESS, HOST_PORT)
-    client.set_login_info(USER_ID, USER_PW)
-    client.set_mountpoint(MOUNT_POINT)
-    
+
+    client = NtripClient(
+        HOST_ADDRESS, 
+        HOST_PORT, 
+        USER_ID, 
+        USER_PW, 
+        MOUNT_POINT
+    )
+
     if client.connect():
         client.send_nmea(NMEA_MESSAGE)
         rtcm_data = client.receive_rtcm()

@@ -12,6 +12,8 @@ class SensorClient:
         self.sensors = {}
         self.power_status = {}
         self.gps_data = {}
+        self.gps_sockets = {}
+        self.nmea_message = None
         self.running = False
         self.threads = []
         
@@ -45,6 +47,13 @@ class SensorClient:
     
     def stop(self):
         self.running = False
+        
+        for sock in self.gps_sockets.values():
+            try:
+                sock.close()
+            except:
+                pass
+        
         for thread in self.threads:
             thread.join(timeout=1.0)
     
@@ -83,6 +92,7 @@ class SensorClient:
             if self.on_sensor_connected:
                 self.on_sensor_connected(ip, channel)
             
+            self.gps_sockets[ip] = sock
             self._receive_gps_data(sock, ip)
             
         except socket.timeout:
@@ -90,6 +100,8 @@ class SensorClient:
         except Exception as e:
             print(f"GPS socket error ({ip}): {e}")
         finally:
+            if ip in self.gps_sockets:
+                del self.gps_sockets[ip]
             try:
                 sock.close()
             except:
@@ -153,6 +165,8 @@ class SensorClient:
                     data = packet.decode('utf-8', errors='ignore')
                     fields = data.split(',')
                     
+                    self.nmea_message = data.strip()
+                    
                     if len(fields) >= 5:
                         try:
                             lat = self._nmea_to_decimal(fields[2])
@@ -173,7 +187,15 @@ class SensorClient:
             except Exception as e:
                 print(f"GPS receive error ({ip}): {e}")
                 break
-    
+
+    def send_rtcm(self, rtcm_data):
+        for ip, sock in self.gps_sockets.items():
+            try:
+                sock.send(rtcm_data)
+                print(f"Sent RTCM data to {ip} ({len(rtcm_data)} bytes)")
+            except Exception as e:
+                print(f"Error sending RTCM to {ip}: {e}")
+
     @staticmethod
     def _nmea_to_decimal(raw):
         raw_float = float(raw)
