@@ -227,7 +227,16 @@ class BiometricRadarApp(QMainWindow):
                 lng, lat = gps
                 self.sensor_list.update_gps(ip, lng, lat)
         
-        # 마커 업데이트
+        # RTK 상태 확인
+        rtk_active = False
+        for ip in self.sensor_client.sensors.keys():
+            rtk_status = self.sensor_client.rtk_status.get(ip)
+            if rtk_status in ['fixed', 'float']:
+                rtk_active = True
+                break
+        
+        self.overlay.set_rtk_status(rtk_active)
+        
         self.update_markers()
     
     def _on_sensor_add_requested(self, ip, name):

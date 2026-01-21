@@ -12,6 +12,7 @@ class SensorClient:
         self.sensors = {}
         self.power_status = {}
         self.gps_data = {}
+        self.rtk_status = {}
         self.power_sockets = {}
         self.gps_sockets = {}
         self.nmea_message = None
@@ -62,6 +63,9 @@ class SensorClient:
         
         if ip in self.gps_data:
             del self.gps_data[ip]
+        
+        if ip in self.rtk_status:
+            del self.rtk_status[ip]
     
     def start(self):
         self.running = True
@@ -290,19 +294,27 @@ class SensorClient:
                     
                     self.nmea_message = data.strip()
                     
-                    if len(fields) >= 5:
-                        try:
-                            lat = self._nmea_to_decimal(fields[2])
-                            lng = self._nmea_to_decimal(fields[4])
-                            
-                            self.gps_data[ip] = (lng, lat)
-                            # 임시 데이터
-                            """self.gps_data["192.168.123.1"] = (126.713423, 37.337056)
-                            self.gps_data["192.168.123.2"] = (126.714391, 37.337489)
-                            self.gps_data["192.168.123.3"] = (126.714658, 37.336942)
-                            """
-                        except (ValueError, IndexError) as e:
-                            print(f"GPS parse error ({ip}): {e}")
+                    if data.startswith('$GPGGA') or data.startswith('$GNGGA'):
+                        if len(fields) >= 7:
+                            try:
+                                lat = self._nmea_to_decimal(fields[2])
+                                lng = self._nmea_to_decimal(fields[4])
+                                self.gps_data[ip] = (lng, lat)
+                                
+                                quality = int(fields[6]) if fields[6] else 0
+                                
+                                # quality: 0=No fix, 1=GPS, 2=DGPS, 4=RTK fixed, 5=RTK float
+                                if quality == 4:
+                                    self.rtk_status[ip] = 'fixed'
+                                    print(f"RTK Fixed: {ip}")
+                                elif quality == 5:
+                                    self.rtk_status[ip] = 'float'
+                                    print(f"RTK Float: {ip}")
+                                else:
+                                    self.rtk_status[ip] = 'none'
+                                
+                            except (ValueError, IndexError) as e:
+                                print(f"GPS parse error ({ip}): {e}")
                     
                     time.sleep(0.1)
                     
